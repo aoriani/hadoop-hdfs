@@ -98,10 +98,10 @@ public class TestBlockRecovery {
     dirs.add(dataDir);
     DatanodeProtocol namenode = mock(DatanodeProtocol.class);
     when(namenode.versionRequest()).thenReturn(new NamespaceInfo(1, 1L, 1));
-    when(namenode.sendHeartbeat(any(DatanodeRegistration.class), anyLong(), 
+    when(namenode.sendHeartbeat(any(DatanodeRegistration.class), anyLong(),
         anyLong(), anyLong(), anyInt(), anyInt())).thenReturn(
             new DatanodeCommand[0]);
-    dn = new DataNode(conf, dirs, namenode);
+//    dn = new DataNode(conf, dirs, namenode);
   }
 
   /**
@@ -125,14 +125,14 @@ public class TestBlockRecovery {
   }
 
   /** Sync two replicas */
-  private void testSyncReplicas(ReplicaRecoveryInfo replica1, 
+  private void testSyncReplicas(ReplicaRecoveryInfo replica1,
       ReplicaRecoveryInfo replica2,
       InterDatanodeProtocol dn1,
       InterDatanodeProtocol dn2) throws IOException {
-    
+
     DatanodeInfo[] locs = new DatanodeInfo[]{
         mock(DatanodeInfo.class), mock(DatanodeInfo.class)};
-    RecoveringBlock rBlock = new RecoveringBlock(block, 
+    RecoveringBlock rBlock = new RecoveringBlock(block,
         locs, RECOVERY_ID);
     ArrayList<BlockRecord> syncList = new ArrayList<BlockRecord>(2);
     BlockRecord record1 = new BlockRecord(
@@ -143,7 +143,7 @@ public class TestBlockRecovery {
     syncList.add(record2);
     dn.syncBlock(rBlock, syncList);
   }
-  
+
   /**
    * BlockRecovery_02.8.
    * Two replicas are in Finalized state
@@ -152,9 +152,9 @@ public class TestBlockRecovery {
   @Test
   public void testFinalizedReplicas () throws IOException {
     LOG.debug("Running " + GenericTestUtils.getMethodName());
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-2, ReplicaState.FINALIZED);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -162,12 +162,12 @@ public class TestBlockRecovery {
 
     testSyncReplicas(replica1, replica2, dn1, dn2);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);    
+    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
 
     // two finalized replicas have different length
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN2, GEN_STAMP-2, ReplicaState.FINALIZED);
 
     try {
@@ -178,20 +178,20 @@ public class TestBlockRecovery {
           "Inconsistent size of finalized replicas. "));
     }
   }
-  
+
   /**
    * BlockRecovery_02.9.
-   * One replica is Finalized and another is RBW. 
+   * One replica is Finalized and another is RBW.
    * @throws IOException in case of an error
    */
   @Test
   public void testFinalizedRbwReplicas() throws IOException {
     LOG.debug("Running " + GenericTestUtils.getMethodName());
-    
+
     // rbw and finalized replicas have the same length
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-2, ReplicaState.RBW);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -200,11 +200,11 @@ public class TestBlockRecovery {
     testSyncReplicas(replica1, replica2, dn1, dn2);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
     verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    
+
     // rbw replica has a different length from the finalized one
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RBW);
 
     dn1 = mock(InterDatanodeProtocol.class);
@@ -215,20 +215,20 @@ public class TestBlockRecovery {
     verify(dn2, never()).updateReplicaUnderRecovery(
         block, RECOVERY_ID, REPLICA_LEN1);
   }
-  
+
   /**
    * BlockRecovery_02.10.
-   * One replica is Finalized and another is RWR. 
+   * One replica is Finalized and another is RWR.
    * @throws IOException in case of an error
    */
   @Test
   public void testFinalizedRwrReplicas() throws IOException {
     LOG.debug("Running " + GenericTestUtils.getMethodName());
-    
+
     // rbw and finalized replicas have the same length
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-2, ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -238,11 +238,11 @@ public class TestBlockRecovery {
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
     verify(dn2, never()).updateReplicaUnderRecovery(
         block, RECOVERY_ID, REPLICA_LEN1);
-    
+
     // rbw replica has a different length from the finalized one
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RBW);
 
     dn1 = mock(InterDatanodeProtocol.class);
@@ -253,7 +253,7 @@ public class TestBlockRecovery {
     verify(dn2, never()).updateReplicaUnderRecovery(
         block, RECOVERY_ID, REPLICA_LEN1);
   }
-  
+
   /**
    * BlockRecovery_02.11.
    * Two replicas are RBW.
@@ -262,9 +262,9 @@ public class TestBlockRecovery {
   @Test
   public void testRBWReplicas() throws IOException {
     LOG.debug("Running " + GenericTestUtils.getMethodName());
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.RBW);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RBW);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -273,20 +273,20 @@ public class TestBlockRecovery {
     testSyncReplicas(replica1, replica2, dn1, dn2);
     long minLen = Math.min(REPLICA_LEN1, REPLICA_LEN2);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
-    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);    
+    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
   }
-  
+
   /**
    * BlockRecovery_02.12.
-   * One replica is RBW and another is RWR. 
+   * One replica is RBW and another is RWR.
    * @throws IOException in case of an error
    */
   @Test
   public void testRBW_RWRReplicas() throws IOException {
     LOG.debug("Running " + GenericTestUtils.getMethodName());
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.RBW);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-2, ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -295,31 +295,31 @@ public class TestBlockRecovery {
     testSyncReplicas(replica1, replica2, dn1, dn2);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
     verify(dn2, never()).updateReplicaUnderRecovery(
-        block, RECOVERY_ID, REPLICA_LEN1);    
+        block, RECOVERY_ID, REPLICA_LEN1);
   }
-  
+
   /**
-   * BlockRecovery_02.13. 
+   * BlockRecovery_02.13.
    * Two replicas are RWR.
    * @throws IOException in case of an error
    */
   @Test
   public void testRWRReplicas() throws IOException {
     LOG.debug("Running " + GenericTestUtils.getMethodName());
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN1, GEN_STAMP-1, ReplicaState.RWR);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
+    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID,
         REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
 
     testSyncReplicas(replica1, replica2, dn1, dn2);
-    
+
     long minLen = Math.min(REPLICA_LEN1, REPLICA_LEN2);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
-    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);    
-  }  
+    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
+  }
 
   private Collection<RecoveringBlock> initRecoveringBlocks() {
     Collection<RecoveringBlock> blocks = new ArrayList<RecoveringBlock>(1);
