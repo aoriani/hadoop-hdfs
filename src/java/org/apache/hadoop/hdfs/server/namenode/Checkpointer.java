@@ -40,18 +40,18 @@ import org.apache.hadoop.http.HttpServer;
 import org.apache.hadoop.util.Daemon;
 
 /**
- * The Checkpointer is responsible for supporting periodic checkpoints 
+ * The Checkpointer is responsible for supporting periodic checkpoints
  * of the HDFS metadata.
  *
  * The Checkpointer is a daemon that periodically wakes up
  * up (determined by the schedule specified in the configuration),
  * triggers a periodic checkpoint and then goes back to sleep.
- * 
+ *
  * The start of a checkpoint is triggered by one of the two factors:
  * (1) time or (2) the size of the edits file.
  */
 class Checkpointer extends Daemon {
-  public static final Log LOG = 
+  public static final Log LOG =
     LogFactory.getLog(Checkpointer.class.getName());
 
   private BackupNode backupNode;
@@ -88,9 +88,9 @@ class Checkpointer extends Daemon {
     shouldRun = true;
 
     // Initialize other scheduling parameters from the configuration
-    checkpointPeriod = conf.getLong(DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_PERIOD_KEY, 
+    checkpointPeriod = conf.getLong(DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_PERIOD_KEY,
                                     DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_PERIOD_DEFAULT);
-    checkpointSize = conf.getLong(DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_SIZE_KEY, 
+    checkpointSize = conf.getLong(DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_SIZE_KEY,
                                   DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_SIZE_DEFAULT);
 
     HttpServer httpServer = backupNode.httpServer;
@@ -200,7 +200,9 @@ class Checkpointer extends Daemon {
     int httpPort = httpSocAddr.getPort();
     String fileid = "putimage=1&port=" + httpPort +
       "&machine=" +
-      InetAddress.getLocalHost().getHostAddress() +
+//FIXME: Change to work on local machine
+//      InetAddress.getLocalHost().getHostAddress() +
+      "127.0.0.1" +
       "&token=" + sig.toString();
     LOG.info("Posted URL " + backupNode.nnHttpAddress + fileid);
     TransferFsImage.getFileClient(backupNode.nnHttpAddress, fileid, (File[])null);
@@ -211,7 +213,7 @@ class Checkpointer extends Daemon {
    */
   void doCheckpoint() throws IOException {
     long startTime = FSNamesystem.now();
-    NamenodeCommand cmd = 
+    NamenodeCommand cmd =
       getNamenode().startCheckpoint(backupNode.getRegistration());
     CheckpointCommand cpCmd = null;
     switch(cmd.getAction()) {
