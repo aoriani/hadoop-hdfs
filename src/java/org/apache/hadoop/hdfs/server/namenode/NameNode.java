@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -137,11 +138,11 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     Configuration.addDefaultResource("hdfs-default.xml");
     Configuration.addDefaultResource("hdfs-site.xml");
   }
-  
-  public long getProtocolVersion(String protocol, 
-                                 long clientVersion) throws IOException { 
+
+  public long getProtocolVersion(String protocol,
+                                 long clientVersion) throws IOException {
     if (protocol.equals(ClientProtocol.class.getName())) {
-      return ClientProtocol.versionID; 
+      return ClientProtocol.versionID;
     } else if (protocol.equals(DatanodeProtocol.class.getName())){
       return DatanodeProtocol.versionID;
     } else if (protocol.equals(NamenodeProtocol.class.getName())){
@@ -154,13 +155,13 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       throw new IOException("Unknown protocol to name node: " + protocol);
     }
   }
-    
+
   public static final int DEFAULT_PORT = 8020;
 
   public static final Log LOG = LogFactory.getLog(NameNode.class.getName());
   public static final Log stateChangeLog = LogFactory.getLog("org.apache.hadoop.hdfs.StateChange");
 
-  protected FSNamesystem namesystem; 
+  protected FSNamesystem namesystem;
   protected NamenodeRole role;
   /** RPC server */
   protected Server server;
@@ -179,7 +180,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   private boolean serviceAuthEnabled = false;
   /** Activated plug-ins. */
   private List<ServicePlugin> plugins;
-  
+
   /** Format a new filesystem.  Destroys any filesystem that may already
    * exist at this location.  **/
   public static void format(Configuration conf) throws IOException {
@@ -202,7 +203,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   public static NameNodeMetrics getNameNodeMetrics() {
     return myMetrics;
   }
-  
+
   public static InetSocketAddress getAddress(String address) {
     return NetUtils.createSocketAddr(address, DEFAULT_PORT);
   }
@@ -228,7 +229,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   public static URI getUri(InetSocketAddress namenode) {
     int port = namenode.getPort();
     String portString = port == DEFAULT_PORT ? "" : (":"+port);
-    return URI.create(FSConstants.HDFS_URI_SCHEME + "://" 
+    return URI.create(FSConstants.HDFS_URI_SCHEME + "://"
         + namenode.getHostName()+portString);
   }
 
@@ -285,15 +286,15 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   /**
    * Initialize name-node.
-   * 
+   *
    * @param conf the configuration
    */
   protected void initialize(Configuration conf) throws IOException {
     InetSocketAddress socAddr = getRpcServerAddress(conf);
     int handlerCount = conf.getInt("dfs.namenode.handler.count", 10);
-    
+
     // set service-level authorization security policy
-    if (serviceAuthEnabled = 
+    if (serviceAuthEnabled =
           conf.getBoolean(
             ServiceAuthorizationManager.SERVICE_AUTHORIZATION_CONFIG, false)) {
       ServiceAuthorizationManager.refresh(conf, new HDFSPolicyProvider());
@@ -301,13 +302,13 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
     NameNode.initMetrics(conf, this.getRole());
     loadNamesystem(conf);
-    // create rpc server 
+    // create rpc server
     this.server = RPC.getServer(NamenodeProtocols.class, this,
                                 socAddr.getHostName(), socAddr.getPort(),
-                                handlerCount, false, conf, 
-				namesystem.getDelegationTokenSecretManager());
+                                handlerCount, false, conf,
+                namesystem.getDelegationTokenSecretManager());
     // The rpc-server port can be ephemeral... ensure we have the correct info
-    this.rpcAddress = this.server.getListenerAddress(); 
+    this.rpcAddress = this.server.getListenerAddress();
     setRpcServerAddress(conf);
 
     activate(conf);
@@ -326,7 +327,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     startHttpServer(conf);
     server.start();  //start RPC server
     startTrashEmptier(conf);
-    
+
     plugins = conf.getInstances("dfs.namenode.plugins", ServicePlugin.class);
     for (ServicePlugin p: plugins) {
       try {
@@ -350,7 +351,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     InetSocketAddress infoSocAddr = getHttpServerAddress(conf);
     String infoHost = infoSocAddr.getHostName();
     int infoPort = infoSocAddr.getPort();
-    this.httpServer = new HttpServer("hdfs", infoHost, infoPort, 
+    this.httpServer = new HttpServer("hdfs", infoHost, infoPort,
         infoPort == 0, conf);
     if (conf.getBoolean("dfs.https.enable", false)) {
       boolean needClientAuth = conf.getBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
@@ -371,7 +372,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     this.httpServer.setAttribute("name.node.address", getNameNodeAddress());
     this.httpServer.setAttribute("name.system.image", getFSImage());
     this.httpServer.setAttribute("name.conf", conf);
-    this.httpServer.addInternalServlet("getDelegationToken", 
+    this.httpServer.addInternalServlet("getDelegationToken",
         DelegationTokenServlet.PATH_SPEC, DelegationTokenServlet.class);
     this.httpServer.addInternalServlet("fsck", "/fsck", FsckServlet.class);
     this.httpServer.addInternalServlet("getimage", "/getimage", GetImageServlet.class);
@@ -394,26 +395,26 @@ public class NameNode implements NamenodeProtocols, FSConstants {
    * Start NameNode.
    * <p>
    * The name-node can be started with one of the following startup options:
-   * <ul> 
+   * <ul>
    * <li>{@link StartupOption#REGULAR REGULAR} - normal name node startup</li>
    * <li>{@link StartupOption#FORMAT FORMAT} - format name node</li>
    * <li>{@link StartupOption#BACKUP BACKUP} - start backup node</li>
    * <li>{@link StartupOption#CHECKPOINT CHECKPOINT} - start checkpoint node</li>
-   * <li>{@link StartupOption#UPGRADE UPGRADE} - start the cluster  
-   * upgrade and create a snapshot of the current file system state</li> 
-   * <li>{@link StartupOption#ROLLBACK ROLLBACK} - roll the  
+   * <li>{@link StartupOption#UPGRADE UPGRADE} - start the cluster
+   * upgrade and create a snapshot of the current file system state</li>
+   * <li>{@link StartupOption#ROLLBACK ROLLBACK} - roll the
    *            cluster back to the previous state</li>
-   * <li>{@link StartupOption#FINALIZE FINALIZE} - finalize 
+   * <li>{@link StartupOption#FINALIZE FINALIZE} - finalize
    *            previous upgrade</li>
    * <li>{@link StartupOption#IMPORT IMPORT} - import checkpoint</li>
    * </ul>
-   * The option is passed via configuration field: 
+   * The option is passed via configuration field:
    * <tt>dfs.namenode.startup</tt>
-   * 
-   * The conf will be modified to reflect the actual ports on which 
+   *
+   * The conf will be modified to reflect the actual ports on which
    * the NameNode is up and running if the user passes the port as
    * <code>zero</code> in the conf.
-   * 
+   *
    * @param conf  confirguration
    * @throws IOException
    */
@@ -421,10 +422,10 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     this(conf, NamenodeRole.ACTIVE);
   }
 
-  protected NameNode(Configuration conf, NamenodeRole role) 
-      throws IOException { 
+  protected NameNode(Configuration conf, NamenodeRole role)
+      throws IOException {
     UserGroupInformation.setConfiguration(conf);
-    DFSUtil.login(conf, 
+    DFSUtil.login(conf,
         DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY,
         DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY);
 
@@ -497,7 +498,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         "Unexpected not positive size: "+size);
     }
 
-    return namesystem.getBlocks(datanode, size); 
+    return namesystem.getBlocks(datanode, size);
   }
 
   /** {@inheritDoc} */
@@ -507,7 +508,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   @Override // NamenodeProtocol
   public void errorReport(NamenodeRegistration registration,
-                          int errorCode, 
+                          int errorCode,
                           String msg) throws IOException {
     verifyRequest(registration);
     LOG.info("Error report from " + registration + ": " + msg);
@@ -562,7 +563,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   /////////////////////////////////////////////////////
   // ClientProtocol
   /////////////////////////////////////////////////////
-  
+
   public Token<DelegationTokenIdentifier> getDelegationToken(Text renewer)
       throws IOException {
     return namesystem.getDelegationToken(renewer);
@@ -579,30 +580,30 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       throws IOException {
     namesystem.cancelDelegationToken(token);
   }
-  
+
   /** {@inheritDoc} */
-  public LocatedBlocks getBlockLocations(String src, 
-                                          long offset, 
-                                          long length) 
+  public LocatedBlocks getBlockLocations(String src,
+                                          long offset,
+                                          long length)
       throws IOException {
     myMetrics.numGetBlockLocations.inc();
-    return namesystem.getBlockLocations(getClientMachine(), 
+    return namesystem.getBlockLocations(getClientMachine(),
                                         src, offset, length);
   }
-  
+
   /**
    * The specification of this method matches that of
    * {@link getBlockLocations(Path)}
    * except that it does not update the file's access time.
    */
-  LocatedBlocks getBlockLocationsNoATime(String src, 
-                                         long offset, 
+  LocatedBlocks getBlockLocationsNoATime(String src,
+                                         long offset,
                                          long length)
       throws IOException {
     myMetrics.numGetBlockLocations.inc();
     return namesystem.getBlockLocations(src, offset, length, false);
   }
-  
+
   private static String getClientMachine() {
     String clientMachine = Server.getRemoteAddress();
     if (clientMachine == null) {
@@ -617,9 +618,9 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /** {@inheritDoc} */
-  public void create(String src, 
+  public void create(String src,
                      FsPermission masked,
-                     String clientName, 
+                     String clientName,
                      EnumSetWritable<CreateFlag> flag,
                      boolean createParent,
                      short replication,
@@ -630,7 +631,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                          +src+" for "+clientName+" at "+clientMachine);
     }
     if (!checkPathLength(src)) {
-      throw new IOException("create: Pathname too long.  Limit " 
+      throw new IOException("create: Pathname too long.  Limit "
                             + MAX_PATH_LENGTH + " characters, " + MAX_PATH_DEPTH + " levels.");
     }
     namesystem.startFile(src,
@@ -642,7 +643,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /** {@inheritDoc} */
-  public LocatedBlock append(String src, String clientName) 
+  public LocatedBlock append(String src, String clientName)
       throws IOException {
     String clientMachine = getClientMachine();
     if (stateChangeLog.isDebugEnabled()) {
@@ -655,11 +656,11 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /** {@inheritDoc} */
-  public boolean setReplication(String src, short replication) 
-    throws IOException {  
+  public boolean setReplication(String src, short replication)
+    throws IOException {
     return namesystem.setReplication(src, replication);
   }
-    
+
   /** {@inheritDoc} */
   public void setPermission(String src, FsPermission permissions)
       throws IOException {
@@ -687,7 +688,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         excludedNodesSet.put(node, node);
       }
     }
-    LocatedBlock locatedBlock = 
+    LocatedBlock locatedBlock =
       namesystem.getAdditionalBlock(src, clientName, previous, excludedNodesSet);
     if (locatedBlock != null)
       myMetrics.numAddBlockOps.inc();
@@ -717,16 +718,16 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     } else if (returnCode == CompleteFileStatus.COMPLETE_SUCCESS) {
       return true;
     } else {
-      throw new IOException("Could not complete write to file " + 
+      throw new IOException("Could not complete write to file " +
                             src + " by " + clientName);
     }
   }
 
   /**
-   * The client has detected an error on the specified located blocks 
-   * and is reporting them to the server.  For now, the namenode will 
-   * mark the block as corrupt.  In the future we might 
-   * check the blocks are actually corrupt. 
+   * The client has detected an error on the specified located blocks
+   * and is reporting them to the server.  For now, the namenode will
+   * mark the block as corrupt.  In the future we might
+   * check the blocks are actually corrupt.
    */
   public void reportBadBlocks(LocatedBlock[] blocks) throws IOException {
     stateChangeLog.info("*DIR* NameNode.reportBadBlocks");
@@ -754,7 +755,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       throws IOException {
     namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes);
   }
-  
+
   /** {@inheritDoc} */
   public void commitBlockSynchronization(Block block,
       long newgenerationstamp, long newlength,
@@ -763,19 +764,19 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     namesystem.commitBlockSynchronization(block,
         newgenerationstamp, newlength, closeFile, deleteblock, newtargets);
   }
-  
-  public long getPreferredBlockSize(String filename) 
+
+  public long getPreferredBlockSize(String filename)
       throws IOException {
     return namesystem.getPreferredBlockSize(filename);
   }
-    
+
   /** {@inheritDoc} */
   @Deprecated
   @Override
   public boolean rename(String src, String dst) throws IOException {
     stateChangeLog.debug("*DIR* NameNode.rename: " + src + " to " + dst);
     if (!checkPathLength(dst)) {
-      throw new IOException("rename: Pathname too long.  Limit " 
+      throw new IOException("rename: Pathname too long.  Limit "
                             + MAX_PATH_LENGTH + " characters, " + MAX_PATH_DEPTH + " levels.");
     }
     boolean ret = namesystem.renameTo(src, dst);
@@ -784,21 +785,21 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     }
     return ret;
   }
-  
-  /** 
+
+  /**
    * {@inheritDoc}
    */
   public void concat(String trg, String[] src) throws IOException {
     namesystem.concat(trg, src);
   }
-  
+
   /** {@inheritDoc} */
   @Override
   public void rename(String src, String dst, Options.Rename... options)
       throws IOException {
     stateChangeLog.debug("*DIR* NameNode.rename: " + src + " to " + dst);
     if (!checkPathLength(dst)) {
-      throw new IOException("rename: Pathname too long.  Limit " 
+      throw new IOException("rename: Pathname too long.  Limit "
                             + MAX_PATH_LENGTH + " characters, " + MAX_PATH_DEPTH + " levels.");
     }
     namesystem.renameTo(src, dst, options);
@@ -819,29 +820,29 @@ public class NameNode implements NamenodeProtocols, FSConstants {
           + ", recursive=" + recursive);
     }
     boolean ret = namesystem.delete(src, recursive);
-    if (ret) 
+    if (ret)
       myMetrics.numDeleteFileOps.inc();
     return ret;
   }
 
   /**
    * Check path length does not exceed maximum.  Returns true if
-   * length and depth are okay.  Returns false if length is too long 
+   * length and depth are okay.  Returns false if length is too long
    * or depth is too great.
-   * 
+   *
    */
   private boolean checkPathLength(String src) {
     Path srcPath = new Path(src);
     return (src.length() <= MAX_PATH_LENGTH &&
             srcPath.depth() <= MAX_PATH_DEPTH);
   }
-    
+
   /** {@inheritDoc} */
   public boolean mkdirs(String src, FsPermission masked, boolean createParent)
       throws IOException {
     stateChangeLog.debug("*DIR* NameNode.mkdirs: " + src);
     if (!checkPathLength(src)) {
-      throw new IOException("mkdirs: Pathname too long.  Limit " 
+      throw new IOException("mkdirs: Pathname too long.  Limit "
                             + MAX_PATH_LENGTH + " characters, " + MAX_PATH_DEPTH + " levels.");
     }
     return namesystem.mkdirs(src,
@@ -852,7 +853,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   /**
    */
   public void renewLease(String clientName) throws IOException {
-    namesystem.renewLease(clientName);        
+    namesystem.renewLease(clientName);
   }
 
   /**
@@ -880,17 +881,17 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
-   * Get the file info for a specific file. If the path refers to a 
+   * Get the file info for a specific file. If the path refers to a
    * symlink then the FileStatus of the symlink is returned.
    * @param src The string representation of the path to the file
    * @return object containing information regarding the file
    *         or null if file not found
    */
-  public HdfsFileStatus getFileLinkInfo(String src) throws IOException { 
+  public HdfsFileStatus getFileLinkInfo(String src) throws IOException {
     myMetrics.numFileInfoOps.inc();
     return namesystem.getFileInfo(src, false);
   }
-  
+
   /** @inheritDoc */
   public long[] getStats() {
     return namesystem.getStats();
@@ -906,7 +907,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     }
     return results;
   }
-    
+
   /**
    * @inheritDoc
    */
@@ -922,10 +923,10 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
-   * @throws AccessControlException 
+   * @throws AccessControlException
    * @inheritDoc
    */
-  public boolean restoreFailedStorage(String arg) 
+  public boolean restoreFailedStorage(String arg)
       throws AccessControlException {
     return namesystem.restoreFailedStorage(arg);
   }
@@ -938,9 +939,9 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
-   * Refresh the list of datanodes that the namenode should allow to  
-   * connect.  Re-reads conf by creating new HdfsConfiguration object and 
-   * uses the files list in the configuration to update the list. 
+   * Refresh the list of datanodes that the namenode should allow to
+   * connect.  Re-reads conf by creating new HdfsConfiguration object and
+   * uses the files list in the configuration to update the list.
    */
   public void refreshNodes() throws IOException {
     namesystem.refreshNodes(new HdfsConfiguration());
@@ -963,13 +964,13 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
-   * Roll the image 
+   * Roll the image
    */
   @Deprecated
   public void rollFsImage() throws IOException {
     namesystem.rollFSImage();
   }
-    
+
   public void finalizeUpgrade() throws IOException {
     namesystem.finalizeUpgrade();
   }
@@ -987,47 +988,47 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /** {@inheritDoc} */
-  public FileStatus[] getCorruptFiles() 
+  public FileStatus[] getCorruptFiles()
     throws AccessControlException, IOException {
-    
+
     return namesystem.getCorruptFiles();
-    
+
   }
-  
+
   /** {@inheritDoc} */
   public ContentSummary getContentSummary(String path) throws IOException {
     return namesystem.getContentSummary(path);
   }
 
   /** {@inheritDoc} */
-  public void setQuota(String path, long namespaceQuota, long diskspaceQuota) 
+  public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
       throws IOException {
     namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
   }
-  
+
   /** {@inheritDoc} */
   public void fsync(String src, String clientName) throws IOException {
     namesystem.fsync(src, clientName);
   }
 
   /** @inheritDoc */
-  public void setTimes(String src, long mtime, long atime) 
+  public void setTimes(String src, long mtime, long atime)
       throws IOException {
     namesystem.setTimes(src, mtime, atime);
   }
 
   /** @inheritDoc */
-  public void createSymlink(String target, String link, FsPermission dirPerms, 
-                            boolean createParent) 
+  public void createSymlink(String target, String link, FsPermission dirPerms,
+                            boolean createParent)
       throws IOException {
     myMetrics.numcreateSymlinkOps.inc();
-    /* We enforce the MAX_PATH_LENGTH limit even though a symlink target 
-     * URI may refer to a non-HDFS file system. 
+    /* We enforce the MAX_PATH_LENGTH limit even though a symlink target
+     * URI may refer to a non-HDFS file system.
      */
     if (!checkPathLength(link)) {
       throw new IOException("Symlink path exceeds " + MAX_PATH_LENGTH +
                             " character limit");
-                            
+
     }
     if ("".equals(target)) {
       throw new IOException("Invalid symlink target");
@@ -1041,13 +1042,13 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   public String getLinkTarget(String path) throws IOException {
     myMetrics.numgetLinkTargetOps.inc();
     /* Resolves the first symlink in the given path, returning a
-     * new path consisting of the target of the symlink and any 
+     * new path consisting of the target of the symlink and any
      * remaining path components from the original path.
      */
     try {
       HdfsFileStatus stat = namesystem.getFileInfo(path, false);
       if (stat != null) {
-        // NB: getSymlink throws IOException if !stat.isSymlink() 
+        // NB: getSymlink throws IOException if !stat.isSymlink()
         return stat.getSymlink();
       }
     } catch (UnresolvedPathException e) {
@@ -1063,18 +1064,18 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   ////////////////////////////////////////////////////////////////
   // DatanodeProtocol
   ////////////////////////////////////////////////////////////////
-  /** 
+  /**
    */
   public DatanodeRegistration registerDatanode(DatanodeRegistration nodeReg)
       throws IOException {
     verifyVersion(nodeReg.getVersion());
     namesystem.registerDatanode(nodeReg);
-      
+
     return nodeReg;
   }
 
   /**
-   * Data node notify the name node that it is alive 
+   * Data node notify the name node that it is alive
    * Return an array of block-oriented commands for the datanode to execute.
    * This will be either a transfer or a delete operation.
    */
@@ -1102,7 +1103,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     return null;
   }
 
-  public void blockReceived(DatanodeRegistration nodeReg, 
+  public void blockReceived(DatanodeRegistration nodeReg,
                             Block blocks[],
                             String delHints[]) throws IOException {
     verifyRequest(nodeReg);
@@ -1114,9 +1115,35 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
+   * @inheritDoc
+   */
+    public Block[] blockReceivedNew(DatanodeRegistration nodeReg,
+            Block blocks[], String delHints[]) throws IOException {
+        blockReceived(nodeReg, blocks, delHints);
+        List<Block> failed = new ArrayList<Block>();
+        for (int i = 0; i < blocks.length; i++) {
+            Block block = blocks[i];
+            synchronized (namesystem) {
+                BlockInfo storedBlock = namesystem.getStoredBlock(block);
+                if (storedBlock == null || storedBlock.getINode() == null) {
+                    // If this block does not belong to anyfile, then record it.
+                    LOG.info("blockReceived request received for " + block
+                            + " on " + nodeReg.getName() + " size "
+                            + block.getNumBytes()
+                            + " But it does not belong to any file."
+                            + " Retry later.");
+                    failed.add(block);
+                }
+            }
+        }
+        return failed.toArray(new Block[failed.size()]);
+    }
+
+
+  /**
    */
   public void errorReport(DatanodeRegistration nodeReg,
-                          int errorCode, 
+                          int errorCode,
                           String msg) throws IOException {
     // Log error message from datanode
     String dnName = (nodeReg == null ? "unknown DataNode" : nodeReg.getName());
@@ -1126,12 +1153,12 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     }
     verifyRequest(nodeReg);
     if (errorCode == DatanodeProtocol.DISK_ERROR) {
-      LOG.warn("Volume failed on " + dnName); 
+      LOG.warn("Volume failed on " + dnName);
     } else if (errorCode == DatanodeProtocol.FATAL_DISK_ERROR) {
-      namesystem.removeDatanode(nodeReg);            
+      namesystem.removeDatanode(nodeReg);
     }
   }
-    
+
   public NamespaceInfo versionRequest() throws IOException {
     return namesystem.getNamespaceInfo();
   }
@@ -1140,12 +1167,12 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     return namesystem.processDistributedUpgradeCommand(comm);
   }
 
-  /** 
+  /**
    * Verify request.
-   * 
-   * Verifies correctness of the datanode version, registration ID, and 
+   *
+   * Verifies correctness of the datanode version, registration ID, and
    * if the datanode does not need to be shutdown.
-   * 
+   *
    * @param nodeReg data node registration
    * @throws IOException
    */
@@ -1154,10 +1181,10 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     if (!namesystem.getRegistrationID().equals(nodeReg.getRegistrationID()))
       throw new UnregisteredNodeException(nodeReg);
   }
-    
+
   /**
    * Verify version.
-   * 
+   *
    * @param version
    * @throws IOException
    */
@@ -1172,7 +1199,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   public File getFsImageName() throws IOException {
     return getFSImage().getFsImageName();
   }
-    
+
   public FSImage getFSImage() {
     return namesystem.dir.fsImage;
   }
@@ -1194,9 +1221,9 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
-   * Returns the address of the NameNodes http server, 
+   * Returns the address of the NameNodes http server,
    * which is used to access the name-node web UI.
-   * 
+   *
    * @return the http address.
    */
   public InetSocketAddress getHttpAddress() {
@@ -1209,9 +1236,9 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   /**
    * Verify that configured directories exist, then
-   * Interactively confirm that formatting is desired 
+   * Interactively confirm that formatting is desired
    * for each existing directory and format them.
-   * 
+   *
    * @param conf
    * @param isConfirmationNeeded
    * @return true if formatting was aborted, false otherwise
@@ -1221,7 +1248,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                                 boolean isConfirmationNeeded)
       throws IOException {
     Collection<URI> dirsToFormat = FSNamesystem.getNamespaceDirs(conf);
-    Collection<URI> editDirsToFormat = 
+    Collection<URI> editDirsToFormat =
                  FSNamesystem.getNamespaceEditsDirs(conf);
     for(Iterator<URI> it = dirsToFormat.iterator(); it.hasNext();) {
       File curDir = new File(it.next().getPath());
@@ -1247,7 +1274,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                                boolean isConfirmationNeeded
                                ) throws IOException {
     Collection<URI> dirsToFormat = FSNamesystem.getNamespaceDirs(conf);
-    Collection<URI> editDirsToFormat = 
+    Collection<URI> editDirsToFormat =
                                FSNamesystem.getNamespaceEditsDirs(conf);
     FSNamesystem nsys = new FSNamesystem(new FSImage(dirsToFormat,
                                          editDirsToFormat), conf);
@@ -1279,7 +1306,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   @Override
   public void refreshUserToGroupsMappings(Configuration conf) throws IOException {
-    LOG.info("Refreshing all user-to-groups mappings. Requested by user: " + 
+    LOG.info("Refreshing all user-to-groups mappings. Requested by user: " +
              UserGroupInformation.getCurrentUser().getShortUserName());
     Groups.getUserToGroupsMappingService(conf).refresh();
   }
@@ -1359,7 +1386,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         return new NameNode(conf);
     }
   }
-    
+
   /**
    */
   public static void main(String argv[]) throws Exception {

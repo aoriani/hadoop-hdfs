@@ -45,7 +45,7 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * 24: register() renamed registerDatanode()
    */
   public static final long versionID = 24L;
-  
+
   // error code
   final static int NOTIFY = 0;
   final static int DISK_ERROR = 1; // there are still valid volumes on DN
@@ -53,10 +53,10 @@ public interface DatanodeProtocol extends VersionedProtocol {
   final static int FATAL_DISK_ERROR = 3; // no valid volumes left on DN
 
   /**
-   * Determines actions that data node should perform 
-   * when receiving a datanode command. 
+   * Determines actions that data node should perform
+   * when receiving a datanode command.
    */
-  final static int DNA_UNKNOWN = 0;    // unknown action   
+  final static int DNA_UNKNOWN = 0;    // unknown action
   final static int DNA_TRANSFER = 1;   // transfer blocks to another datanode
   final static int DNA_INVALIDATE = 2; // invalidate blocks
   final static int DNA_SHUTDOWN = 3;   // shutdown node
@@ -65,13 +65,13 @@ public interface DatanodeProtocol extends VersionedProtocol {
   final static int DNA_RECOVERBLOCK = 6;  // request a block recovery
   final static int DNA_ACCESSKEYUPDATE = 7;  // update access key
 
-  /** 
+  /**
    * Register Datanode.
    *
    * @see org.apache.hadoop.hdfs.server.datanode.DataNode#dnRegistration
    * @see org.apache.hadoop.hdfs.server.namenode.FSNamesystem#registerDatanode(DatanodeRegistration)
-   * 
-   * @return updated {@link org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration}, which contains 
+   *
+   * @return updated {@link org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration}, which contains
    * new storageID if the datanode did not have one and
    * registration ID for further communication.
    */
@@ -79,10 +79,10 @@ public interface DatanodeProtocol extends VersionedProtocol {
                                        ) throws IOException;
   /**
    * sendHeartbeat() tells the NameNode that the DataNode is still
-   * alive and well.  Includes some status info, too. 
-   * It also gives the NameNode a chance to return 
+   * alive and well.  Includes some status info, too.
+   * It also gives the NameNode a chance to return
    * an array of "DatanodeCommand" objects.
-   * A DatanodeCommand tells the DataNode to invalidate local block(s), 
+   * A DatanodeCommand tells the DataNode to invalidate local block(s),
    * or to copy them to other DataNodes, etc.
    */
   @Nullable
@@ -102,13 +102,13 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * @param blocks - the block list as an array of longs.
    *     Each block is represented as 2 longs.
    *     This is done instead of Block[] to reduce memory used by block reports.
-   *     
+   *
    * @return - the next command for DN to process.
    * @throws IOException
    */
   public DatanodeCommand blockReport(DatanodeRegistration registration,
                                      long[] blocks) throws IOException;
-    
+
   /**
    * blockReceived() allows the DataNode to tell the NameNode about
    * recently-received block data, with a hint for pereferred replica
@@ -121,34 +121,39 @@ public interface DatanodeProtocol extends VersionedProtocol {
                             Block blocks[],
                             String[] delHints) throws IOException;
 
+  public Block[] blockReceivedNew(DatanodeRegistration registration,
+                                  Block blocks[],
+                                  String[] delHints) throws IOException;
+
+
   /**
    * errorReport() tells the NameNode about something that has gone
    * awry.  Useful for debugging.
    */
   public void errorReport(DatanodeRegistration registration,
-                          int errorCode, 
+                          int errorCode,
                           String msg) throws IOException;
-    
+
   public NamespaceInfo versionRequest() throws IOException;
 
   /**
    * This is a very general way to send a command to the name-node during
    * distributed upgrade process.
-   * 
+   *
    * The generosity is because the variety of upgrade commands is unpredictable.
-   * The reply from the name-node is also received in the form of an upgrade 
-   * command. 
-   * 
+   * The reply from the name-node is also received in the form of an upgrade
+   * command.
+   *
    * @return a reply in the form of an upgrade command
    */
   UpgradeCommand processUpgradeCommand(UpgradeCommand comm) throws IOException;
-  
+
   /**
    * same as {@link org.apache.hadoop.hdfs.protocol.ClientProtocol#reportBadBlocks(LocatedBlock[])}
    * }
    */
   public void reportBadBlocks(LocatedBlock[] blocks) throws IOException;
-  
+
   /**
    * Commit block synchronization in lease recovery
    */

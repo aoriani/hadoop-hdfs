@@ -54,6 +54,7 @@ import org.apache.hadoop.net.NetUtils;
  */
 @InterfaceAudience.Private
 public class BackupNode extends NameNode {
+  private static final int    INVALIDATES_CLEANUP_INTERVAL = 60 * 1000;
   private static final String BN_ADDRESS_NAME_KEY = DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY;
   private static final String BN_ADDRESS_DEFAULT = DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_DEFAULT;
   private static final String BN_HTTP_ADDRESS_NAME_KEY = DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY;
@@ -67,6 +68,10 @@ public class BackupNode extends NameNode {
   String nnHttpAddress;
   /** Checkpoint manager */
   Checkpointer checkpointManager;
+
+  private InvalidatesCleaner cleaner;      // The thread cleaning up invalidates
+  private Thread cleanerThread;
+
 
   BackupNode(Configuration conf, NamenodeRole role) throws IOException {
     super(conf, role);
@@ -127,6 +132,19 @@ public class BackupNode extends NameNode {
     conf.setLong("fs.trash.interval", 0L);
     NamespaceInfo nsInfo = handshake(conf);
     super.initialize(conf);
+
+    // If we are starting as a Hot Standby, then put namenode in
+    // safemode. This prevents this instance of the NameNode from
+    // doing active replication of blocks.
+    //
+      setSafeMode(SafeModeAction.SAFEMODE_ENTER);
+      // do not allow anybody else to directly contact the underlying
+      // namenode object to exit safemode.
+      super.namesystem.setSafeModeManualOverride(true);
+      cleaner = new InvalidatesCleaner();
+      cleanerThread = new Thread(cleaner);
+      cleanerThread.start();
+
     // Backup node should never do lease recovery,
     // therefore lease hard limit should never expire.
     namesystem.leaseManager.setLeasePeriod(
@@ -182,7 +200,7 @@ public class BackupNode extends NameNode {
   @Override // NamenodeProtocol
   public NamenodeRegistration register(NamenodeRegistration registration
   ) throws IOException {
-    throw new UnsupportedActionException("journal");
+    throw new UnsupportedActionException("register");
   }
 
   @Override // NamenodeProtocol
@@ -364,4 +382,52 @@ public class BackupNode extends NameNode {
       + FSConstants.LAYOUT_VERSION + " actual "+ nsInfo.getLayoutVersion();
     return nsInfo;
   }
+
+
+  //Clean Invalidate blocks
+  //Because only when file is closed the backup now will be aware of blocks
+  // Any new block received by it will be considered invalid
+  private class InvalidatesCleaner implements Runnable {
+    volatile boolean running = true;
+    @Override
+    public void run() {
+      while (running) {
+        clearInvalidates();
+        try {
+          Thread.sleep(INVALIDATES_CLEANUP_INTERVAL);
+        } catch (InterruptedException iex) {
+          if (running == false)
+            return;
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+    public void stop() {
+      running = false;
+    }
+  }
+
+  private void clearInvalidates() {
+    try {
+      DatanodeInfo[] nodes = super.getDatanodeReport(DatanodeReportType.ALL);
+      assert namesystem.isInSafeMode();
+      synchronized(super.namesystem) {
+        for (DatanodeInfo node : nodes) {
+          super.namesystem.removeFromInvalidates(node.getStorageID());
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void switchToActive(){
+      //stop checkpointer
+      //stop invalidateCleaner
+      //clear Invalidates
+	  // Restore lease Trashing
+	  //Leave safe mode
+
+  }
+
 }

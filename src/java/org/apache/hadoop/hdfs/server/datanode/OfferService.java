@@ -77,9 +77,6 @@ public class OfferService implements Runnable {
   private int backlogSize; // if we accumulate this many blockReceived, then it is time
                            // to send a block report. Otherwise the receivedBlockList
                            // might exceed our Heap size.
-  private LinkedList<Block> receivedBlockList = new LinkedList<Block>();
-  private LinkedList<String> delHints = new LinkedList<String>();
-  private long lastBlockReceivedFailed = 0;
 
   /**
    * A data structure to store Block and delHints together
@@ -92,7 +89,9 @@ public class OfferService implements Runnable {
     }
   }
 
+  private TreeSet<BlockInfo> receivedBlockList = new TreeSet<BlockInfo>();
   private TreeSet<BlockInfo> retryBlockList = new TreeSet<BlockInfo>();
+  private long lastBlockReceivedFailed = 0;
 
   /**
    * Offer service to the specified namenode
@@ -140,8 +139,6 @@ public class OfferService implements Runnable {
         while (shouldRun) {
           try {
 
-
-
               // If we are falling behind in confirming blockReceived to NN, then
               // we clear the backlog and schedule a block report. This scenario
               // is likely to arise if one of the NN is down for an extended period.
@@ -159,7 +156,6 @@ public class OfferService implements Runnable {
 
 
             long startTime = datanode.now();
-
 
             //
             // Every so often, send heartbeat or block-report
@@ -330,38 +326,64 @@ public class OfferService implements Runnable {
        * @throws IOException
        */
       private void reportReceivedBlocks() throws IOException {
-        //check if there are newly received blocks
-        Block [] blockArray=null;
-        String [] delHintArray=null;
+        // check if there are newly received blocks
+        BlockInfo [] blockArray=null;
+        int numBlocks = 0;
         synchronized(receivedBlockList) {
-          synchronized(delHints){
-            int numBlocks = receivedBlockList.size();
-            if (numBlocks > 0) {
-              if(numBlocks!=delHints.size()) {
-                LOG.warn("Panic: receiveBlockList and delHints are not of the same length" );
-              }
-              //
-              // Send newly-received blockids to namenode
-              //
-              blockArray = receivedBlockList.toArray(new Block[numBlocks]);
-              delHintArray = delHints.toArray(new String[numBlocks]);
+            // retry previously failed blocks every few seconds
+          if (lastBlockReceivedFailed + 10000 < datanode.now()) {
+            for (BlockInfo blk : retryBlockList) {
+              receivedBlockList.add(blk);
             }
+            retryBlockList.clear();
+          }
+          numBlocks = receivedBlockList.size();
+          if (numBlocks > 0) {
+            blockArray = receivedBlockList.toArray(new BlockInfo[numBlocks]);
           }
         }
         if (blockArray != null) {
-          if(delHintArray == null || delHintArray.length != blockArray.length ) {
-            LOG.warn("Panic: block array & delHintArray are not the same" );
+          String[] delHintArray = new String[numBlocks];
+          Block[]  blist = new Block[numBlocks];
+          for (int i = 0; i < numBlocks; i++) {
+            delHintArray[i] = blockArray[i].delHints;
+            blist[i] = new Block(blockArray[i]);
           }
-          namenode.blockReceived(dnRegistration, blockArray, delHintArray);
-          synchronized(receivedBlockList) {
-            synchronized(delHints){
-              for(int i=0; i<blockArray.length; i++) {
-                receivedBlockList.remove(blockArray[i]);
-                delHints.remove(delHintArray[i]);
+          Block[] failed = namenode.blockReceivedNew(dnRegistration, blist,
+                                                       delHintArray);
+          synchronized (receivedBlockList) {
+            // Blocks that do not belong to an Inode are saved for retransmisions
+            for (int i = 0; i < failed.length; i++) {
+              BlockInfo info = null;
+              for(int j = 0; j < blockArray.length; j++) {
+                if (blockArray[j].equals(failed[i])) {
+                  info = blockArray[j];
+                  break;
+                }
               }
+              if (info == null) {
+                LOG.warn("BlockReceived failed for block " + failed[i] +
+                         " but it is not in our request list.");
+              } else if (receivedBlockList.contains(info)) {
+                 // Insert into retry list only if the block was not deleted
+                 // on this datanode. That is why we have to recheck if the
+                 // block still exists in receivedBlockList.
+                 LOG.info("Block " + info + " does not belong to any file " +
+                          "on namenode " + namenodeAddress + " Retry later.");
+                 retryBlockList.add(info);
+                 lastBlockReceivedFailed = datanode.now();
+              } else {
+                 LOG.info("Block " + info + " does not belong to any file " +
+                          "on namenode " + namenodeAddress +
+                          " but will not be retried.");
+              }
+            }
+            for (int i = 0; i < blockArray.length; i++) {
+              receivedBlockList.remove(blockArray[i]);
             }
           }
         }
+
       }
 
       /**
@@ -401,7 +423,7 @@ public class OfferService implements Runnable {
              *   2) unexpected like 11:35:43, next report should be at 12:20:14
              */
             lastBlockReport += (datanode.now() - lastBlockReport) /
-            	datanode.blockReportInterval * datanode.blockReportInterval;
+                datanode.blockReportInterval * datanode.blockReportInterval;
           }
         }
         return cmd;
@@ -412,23 +434,22 @@ public class OfferService implements Runnable {
        * till namenode is informed before responding with success to the
        * client? For now we don't.
        */
-      protected void notifyNamenodeReceivedBlock(Block block, String delHint) {
-        if(block==null || delHint==null) {
-          throw new IllegalArgumentException(block==null?"Block is null":"delHint is null");
+    protected void notifyNamenodeReceivedBlock(Block block, String delHint) {
+        if (block == null || delHint == null) {
+            throw new IllegalArgumentException(block == null ? "Block is null"
+                    : "delHint is null");
         }
         synchronized (receivedBlockList) {
-          synchronized (delHints) {
-            receivedBlockList.add(block);
-            delHints.add(delHint);
+            receivedBlockList.add(new BlockInfo(block, delHint));
             receivedBlockList.notifyAll();
-          }
         }
-      }
 
-	private void processDistributedUpgradeCommand(UpgradeCommand comm)
-			throws IOException {
-		assert datanode.upgradeManager != null : "DataNode.upgradeManager is null.";
-		datanode.upgradeManager.processUpgradeCommand(comm);
+    }
+
+    private void processDistributedUpgradeCommand(UpgradeCommand comm)
+            throws IOException {
+        assert datanode.upgradeManager != null : "DataNode.upgradeManager is null.";
+        datanode.upgradeManager.processUpgradeCommand(comm);
 }
 
 

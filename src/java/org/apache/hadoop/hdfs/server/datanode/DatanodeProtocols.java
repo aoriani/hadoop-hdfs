@@ -143,6 +143,13 @@ public class DatanodeProtocols implements DatanodeProtocol {
     throw new IOException("blockReceived" + errMessage);
   }
 
+  @Override
+  public Block[] blockReceivedNew(DatanodeRegistration registration,
+                            Block blocks[],
+                            String[] delHints) throws IOException {
+    throw new IOException("blockReceivedNew" + errMessage);
+  }
+
   /** {@inheritDoc} */
   @Override
   public void errorReport(DatanodeRegistration registration,
