@@ -73,6 +73,8 @@ elif [ "$COMMAND" = "oiv" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.offlineImageViewer.OfflineImageViewer
 elif [ "$COMMAND" = "fetchdt" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.DelegationTokenFetcher
+elif [ "$COMMAND" = "failover" ] ; then
+  CLASS=org.apache.hadoop.hdfs.server.namenode.FailoverSwitcher
 else
   echo $COMMAND - invalid command
   print_usage

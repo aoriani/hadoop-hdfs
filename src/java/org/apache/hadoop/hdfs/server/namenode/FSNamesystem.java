@@ -408,6 +408,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   FSNamesystem(Configuration conf, BackupStorage bnImage) throws IOException {
     try {
       initialize(conf, bnImage);
+      this.dir.setReady(true);
     } catch(IOException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();

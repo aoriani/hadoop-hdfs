@@ -109,7 +109,16 @@ class Checkpointer extends Daemon {
    */
   void shutdown() {
     shouldRun = false;
-    backupNode.stop();
+
+    /*
+     * We only want to stop backup node due a error in the checkpointer
+     * if it is passive state doing checkpoint. If the backup node is active
+     * the checkpointer should not have been running. So any error here should be
+     * because we are trying to stop it.
+     */
+    if(!backupNode.isActive){
+    	backupNode.stop();
+    }
   }
 
   //

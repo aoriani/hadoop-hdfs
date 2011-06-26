@@ -24,6 +24,7 @@ import java.net.SocketTimeoutException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.FailoverProtocol;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdfs.server.namenode.CheckpointSignature;
 import org.apache.hadoop.hdfs.server.namenode.FSImage.CheckpointStates;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
@@ -53,7 +55,7 @@ import org.apache.hadoop.net.NetUtils;
  * </ol>
  */
 @InterfaceAudience.Private
-public class BackupNode extends NameNode {
+public class BackupNode extends NameNode implements FailoverProtocol {
   private static final int    INVALIDATES_CLEANUP_INTERVAL = 60 * 1000;
   private static final String BN_ADDRESS_NAME_KEY = DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY;
   private static final String BN_ADDRESS_DEFAULT = DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_DEFAULT;
@@ -72,6 +74,10 @@ public class BackupNode extends NameNode {
   private InvalidatesCleaner cleaner;      // The thread cleaning up invalidates
   private Thread cleanerThread;
 
+  /**Whether  this backupnode had become active*/
+  volatile boolean isActive = false;
+
+  Server failoverServer;
 
   BackupNode(Configuration conf, NamenodeRole role) throws IOException {
     super(conf, role);
@@ -153,6 +159,9 @@ public class BackupNode extends NameNode {
     registerWith(nsInfo);
     // Checkpoint daemon should start after the rpc server started
     runCheckpointDaemon(conf);
+
+    failoverServer = RPC.getServer(FailoverProtocol.class,this, "127.0.0.1", 4444, conf);
+    failoverServer.start();
   }
 
   @Override // NameNode
@@ -178,6 +187,11 @@ public class BackupNode extends NameNode {
     // Stop the RPC client
     RPC.stopProxy(namenode);
     namenode = null;
+
+    if(failoverServer != null){
+    	RPC.stopProxy(failoverServer);
+    }
+
     // Stop the checkpoint manager
     if(checkpointManager != null) {
       checkpointManager.interrupt();
@@ -421,13 +435,59 @@ public class BackupNode extends NameNode {
     }
   }
 
-  private void switchToActive(){
-      //stop checkpointer
-      //stop invalidateCleaner
-      //clear Invalidates
-	  // Restore lease Trashing
-	  //Leave safe mode
+  @Override
+  public void switchToActive() throws IOException{
 
+      LOG.info("==== BEGIN FAILOVER ====");
+      LOG.info("Moving backup to active state");
+      isActive = true;
+
+      LOG.info("Stopping checkpointer");
+      //Stop the checkpointer
+      if(checkpointManager != null){
+          checkpointManager.shouldRun = false;
+          checkpointManager.interrupt();
+          try {
+              checkpointManager.join();
+              checkpointManager = null;
+            } catch (InterruptedException ie) {
+            }
+      }
+
+      LOG.info("Stopping the invalidate cleaner");
+      //Stop the invalidate clearner
+      cleaner.stop();
+      cleanerThread.interrupt();
+      try {
+        cleanerThread.join();
+      } catch (InterruptedException iex) {
+
+      }
+      clearInvalidates();
+
+      //Restore Trash
+      //Trash is disable by default, so despite of comment above we do nothing about
+
+      LOG.info("Reconfiguring lease recovery");
+      //Restore Lease settings
+      namesystem.leaseManager.setLeasePeriod(
+                FSConstants.LEASE_SOFTLIMIT_PERIOD, FSConstants.LEASE_HARDLIMIT_PERIOD);
+
+      //Leave Safemode
+      LOG.info("Leaving Safe Mode");
+      super.namesystem.setSafeModeManualOverride(false);
+      setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
+
+      LOG.info("==== END FAILOVER ====");
   }
+
+    @Override
+    public long getProtocolVersion(String protocol, long clientVersion)
+            throws IOException {
+        if(protocol.equals(FailoverProtocol.class.getName())){
+            return FailoverProtocol.versionID;
+        }else
+        return super.getProtocolVersion(protocol, clientVersion);
+    }
 
 }
