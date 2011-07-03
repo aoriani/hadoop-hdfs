@@ -197,6 +197,13 @@ public class BackupNode extends NameNode implements FailoverProtocol {
       checkpointManager.interrupt();
       checkpointManager = null;
     }
+
+    cleaner.stop();
+    cleanerThread.interrupt();
+    try {
+      cleanerThread.join();
+    } catch (InterruptedException iex) {
+    }
     // Stop name-node threads
     super.stop();
   }
@@ -489,5 +496,12 @@ public class BackupNode extends NameNode implements FailoverProtocol {
         }else
         return super.getProtocolVersion(protocol, clientVersion);
     }
+
+	@Override
+	public void doFailover() throws IOException {
+		switchToActive();
+	}
+
+
 
 }

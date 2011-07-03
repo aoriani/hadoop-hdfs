@@ -62,6 +62,7 @@ import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem.CompleteFileStatus;
+import org.apache.hadoop.hdfs.server.namenode.failover.FailoverManager;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -158,6 +159,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   public static final int DEFAULT_PORT = 8020;
 
+  protected FailoverManager failoverManager;
+
   public static final Log LOG = LogFactory.getLog(NameNode.class.getName());
   public static final Log stateChangeLog = LogFactory.getLog("org.apache.hadoop.hdfs.StateChange");
 
@@ -167,7 +170,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   protected Server server;
   /** RPC server address */
   protected InetSocketAddress rpcAddress = null;
-  /** httpServer */
+
+/** httpServer */
   protected HttpServer httpServer;
   /** HTTP server address */
   protected InetSocketAddress httpAddress = null;
@@ -313,6 +317,11 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
     activate(conf);
     LOG.info(getRole() + " up at: " + rpcAddress);
+
+    //Register for failover
+    String zooConnString = conf.get("dfs.zookeeper", "127.0.0.1");
+    failoverManager = new FailoverManager(this,zooConnString);
+    failoverManager.register();
   }
 
   /**
@@ -481,6 +490,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     if (namesystem != null) {
       namesystem.shutdown();
     }
+
+    failoverManager.shutdown();
   }
 
   synchronized boolean isStopRequested() {
@@ -1400,4 +1411,13 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       System.exit(-1);
     }
   }
+
+  public void doFailover() throws IOException {
+    throw new UnsupportedActionException("doFailover");
+  }
+
+  public InetSocketAddress getRpcAddress() {
+	    return rpcAddress;
+  }
+
 }
