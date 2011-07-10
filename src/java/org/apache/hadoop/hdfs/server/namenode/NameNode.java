@@ -320,7 +320,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
     //Register for failover
     String zooConnString = conf.get("dfs.zookeeper", "127.0.0.1");
-    failoverManager = new FailoverManager(this,zooConnString);
+    failoverManager = new FailoverManager(this,myMetrics,zooConnString);
     failoverManager.register();
   }
 

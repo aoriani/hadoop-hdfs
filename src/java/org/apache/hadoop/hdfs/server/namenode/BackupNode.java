@@ -479,6 +479,7 @@ public class BackupNode extends NameNode implements FailoverProtocol {
       //Restore Lease settings
       namesystem.leaseManager.setLeasePeriod(
                 FSConstants.LEASE_SOFTLIMIT_PERIOD, FSConstants.LEASE_HARDLIMIT_PERIOD);
+      namesystem.leaseManager.expireAll();
 
       //Leave Safemode
       LOG.info("Leaving Safe Mode");

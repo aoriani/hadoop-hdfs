@@ -32,7 +32,7 @@ import org.apache.hadoop.metrics.util.MetricsTimeVaryingInt;
 import org.apache.hadoop.metrics.util.MetricsTimeVaryingRate;
 
 /**
- * 
+ *
  * This class is for maintaining  the various NameNode activity statistics
  * and publishing them through the metrics interfaces.
  * This also registers the JMX MBean for RPC.
@@ -48,33 +48,33 @@ public class NameNodeMetrics implements Updater {
     private static Log log = LogFactory.getLog(NameNodeMetrics.class);
     private final MetricsRecord metricsRecord;
     public MetricsRegistry registry = new MetricsRegistry();
-    
+
     private NameNodeActivityMBean namenodeActivityMBean;
-    
-    public MetricsTimeVaryingInt numCreateFileOps = 
+
+    public MetricsTimeVaryingInt numCreateFileOps =
                     new MetricsTimeVaryingInt("CreateFileOps", registry);
     public MetricsTimeVaryingInt numFilesCreated =
                           new MetricsTimeVaryingInt("FilesCreated", registry);
     public MetricsTimeVaryingInt numFilesAppended =
                           new MetricsTimeVaryingInt("FilesAppended", registry);
-    public MetricsTimeVaryingInt numGetBlockLocations = 
+    public MetricsTimeVaryingInt numGetBlockLocations =
                     new MetricsTimeVaryingInt("GetBlockLocations", registry);
     public MetricsTimeVaryingInt numFilesRenamed =
                     new MetricsTimeVaryingInt("FilesRenamed", registry);
-    public MetricsTimeVaryingInt numGetListingOps = 
+    public MetricsTimeVaryingInt numGetListingOps =
                     new MetricsTimeVaryingInt("GetListingOps", registry);
-    public MetricsTimeVaryingInt numDeleteFileOps = 
+    public MetricsTimeVaryingInt numDeleteFileOps =
                           new MetricsTimeVaryingInt("DeleteFileOps", registry);
     public MetricsTimeVaryingInt numFilesDeleted = new MetricsTimeVaryingInt(
-        "FilesDeleted", registry, 
+        "FilesDeleted", registry,
         "Number of files and directories deleted by delete or rename operation");
     public MetricsTimeVaryingInt numFileInfoOps =
                           new MetricsTimeVaryingInt("FileInfoOps", registry);
-    public MetricsTimeVaryingInt numAddBlockOps = 
+    public MetricsTimeVaryingInt numAddBlockOps =
                           new MetricsTimeVaryingInt("AddBlockOps", registry);
-    public MetricsTimeVaryingInt numcreateSymlinkOps = 
+    public MetricsTimeVaryingInt numcreateSymlinkOps =
                           new MetricsTimeVaryingInt("CreateSymlinkOps", registry);
-    public MetricsTimeVaryingInt numgetLinkTargetOps = 
+    public MetricsTimeVaryingInt numgetLinkTargetOps =
                           new MetricsTimeVaryingInt("GetLinkTargetOps", registry);
 
     public MetricsTimeVaryingRate transactions = new MetricsTimeVaryingRate(
@@ -88,14 +88,15 @@ public class NameNodeMetrics implements Updater {
                     new MetricsTimeVaryingRate("blockReport", registry, "Block Report");
     public MetricsIntValue safeModeTime =
                     new MetricsIntValue("SafemodeTime", registry, "Duration in SafeMode at Startup");
-    public MetricsIntValue fsImageLoadTime = 
+    public MetricsIntValue fsImageLoadTime =
                     new MetricsIntValue("fsImageLoadTime", registry, "Time loading FS Image at Startup");
     public MetricsIntValue numBlocksCorrupted =
                     new MetricsIntValue("BlocksCorrupted", registry);
-    public MetricsTimeVaryingInt numFilesInGetListingOps = 
+    public MetricsTimeVaryingInt numFilesInGetListingOps =
                     new MetricsTimeVaryingInt("FilesInGetListingOps", registry);
+    public MetricsIntValue failoverTime = new MetricsIntValue("FailoverTime",registry,"Time to process Failover");
 
-      
+
     public NameNodeMetrics(Configuration conf, NamenodeRole nameNodeRole) {
       String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
       // Initiate Java VM metrics
@@ -104,7 +105,7 @@ public class NameNodeMetrics implements Updater {
 
       // Now the Mbean for the name node - this also registers the MBean
       namenodeActivityMBean = new NameNodeActivityMBean(registry);
-      
+
       // Create a record for NameNode metrics
       MetricsContext metricsContext = MetricsUtil.getContext("dfs");
       metricsRecord = MetricsUtil.createRecord(metricsContext, processName.toLowerCase());
@@ -113,14 +114,14 @@ public class NameNodeMetrics implements Updater {
       log.info("Initializing NameNodeMeterics using context object:" +
                 metricsContext.getClass().getName());
     }
-    
 
-    
+
+
     public void shutdown() {
-      if (namenodeActivityMBean != null) 
+      if (namenodeActivityMBean != null)
         namenodeActivityMBean.shutdown();
     }
-      
+
     /**
      * Since this object is a registered updater, this method will be called
      * periodically, e.g. every 5 seconds.

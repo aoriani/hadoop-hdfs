@@ -35,9 +35,9 @@ import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 
 /**
- * LeaseManager does the lease housekeeping for writing on files.   
+ * LeaseManager does the lease housekeeping for writing on files.
  * This class also provides useful static methods for lease recovery.
- * 
+ *
  * Lease Recovery Algorithm
  * 1) Namenode retrieves lease information
  * 2) For each file f in the lease, consider the last block b of f
@@ -48,7 +48,7 @@ import org.apache.hadoop.hdfs.protocol.FSConstants;
  * 2.4) p get the block info from each datanode
  * 2.5) p computes the minimum block length
  * 2.6) p updates the datanodes, which have a valid generation stamp,
- *      with the new generation stamp and the minimum block length 
+ *      with the new generation stamp and the minimum block length
  * 2.7) p acknowledges the namenode the update results
 
  * 2.8) Namenode updates the BlockInfo
@@ -73,7 +73,7 @@ public class LeaseManager {
   // Set of: Lease
   private SortedSet<Lease> sortedLeases = new TreeSet<Lease>();
 
-  // 
+  //
   // Map path names to leases. It is protected by the sortedLeases lock.
   // The map stores pathnames in lexicographical order.
   //
@@ -84,7 +84,7 @@ public class LeaseManager {
   Lease getLease(String holder) {
     return leases.get(holder);
   }
-  
+
   SortedSet<Lease> getSortedLeases() {return sortedLeases;}
 
   /** @return the lease containing src */
@@ -101,7 +101,7 @@ public class LeaseManager {
     }
     return count;
   }
-  
+
   /**
    * Adds (or re-adds) the lease for the specified file.
    */
@@ -118,6 +118,7 @@ public class LeaseManager {
     lease.paths.add(src);
     return lease;
   }
+
 
   /**
    * Remove the specified lease and src.
@@ -198,7 +199,7 @@ public class LeaseManager {
     private final String holder;
     private long lastUpdate;
     private final Collection<String> paths = new TreeSet<String>();
-  
+
     /** Only LeaseManager object can create a lease */
     private Lease(String holder) {
       this.holder = holder;
@@ -217,6 +218,10 @@ public class LeaseManager {
     /** @return true if the Soft Limit Timer has expired */
     public boolean expiredSoftLimit() {
       return FSNamesystem.now() - lastUpdate > softLimit;
+    }
+
+    public void expire(){
+    	lastUpdate = 0;
     }
 
     /**
@@ -247,7 +252,7 @@ public class LeaseManager {
       return "[Lease.  Holder: " + holder
           + ", pendingcreates: " + paths.size() + "]";
     }
-  
+
     /** {@inheritDoc} */
     public int compareTo(Lease o) {
       Lease l1 = this;
@@ -262,7 +267,7 @@ public class LeaseManager {
         return l1.holder.compareTo(l2.holder);
       }
     }
-  
+
     /** {@inheritDoc} */
     public boolean equals(Object o) {
       if (!(o instanceof Lease)) {
@@ -275,12 +280,12 @@ public class LeaseManager {
       }
       return false;
     }
-  
+
     /** {@inheritDoc} */
     public int hashCode() {
       return holder.hashCode();
     }
-    
+
     Collection<String> getPaths() {
       return paths;
     }
@@ -299,7 +304,7 @@ public class LeaseManager {
       String overwrite, String replaceBy) {
     if (LOG.isDebugEnabled()) {
       LOG.debug(getClass().getSimpleName() + ".changelease: " +
-               " src=" + src + ", dest=" + dst + 
+               " src=" + src + ", dest=" + dst +
                ", overwrite=" + overwrite +
                ", replaceBy=" + replaceBy);
     }
@@ -325,10 +330,15 @@ public class LeaseManager {
         LOG.debug(LeaseManager.class.getSimpleName()
             + ".removeLeaseWithPrefixPath: entry=" + entry);
       }
-      removeLease(entry.getValue(), entry.getKey());    
+      removeLease(entry.getValue(), entry.getKey());
     }
   }
 
+  synchronized void expireAll(){
+	  for(Lease lease:sortedLeases){
+		  lease.expire();
+	  }
+  }
   static private List<Map.Entry<String, Lease>> findLeaseWithPrefixPath(
       String prefix, SortedMap<String, Lease> path2lease) {
     if (LOG.isDebugEnabled()) {
@@ -352,9 +362,9 @@ public class LeaseManager {
 
   public void setLeasePeriod(long softLimit, long hardLimit) {
     this.softLimit = softLimit;
-    this.hardLimit = hardLimit; 
+    this.hardLimit = hardLimit;
   }
-  
+
   /******************************************************
    * Monitor checks for leases that have expired,
    * and disposes of them.
@@ -393,7 +403,7 @@ public class LeaseManager {
       LOG.info("Lease " + oldest + " has expired hard limit");
 
       final List<String> removing = new ArrayList<String>();
-      // need to create a copy of the oldest lease paths, becuase 
+      // need to create a copy of the oldest lease paths, becuase
       // internalReleaseLease() removes paths corresponding to empty files,
       // i.e. it needs to modify the collection being iterated over
       // causing ConcurrentModificationException

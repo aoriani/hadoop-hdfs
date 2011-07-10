@@ -10,6 +10,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.failover.transactions.CreateNodeTransaction;
 import org.apache.hadoop.hdfs.server.namenode.failover.transactions.ExistsTransaction;
 import org.apache.hadoop.hdfs.server.namenode.failover.transactions.SetDataTransaction;
+import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -33,11 +34,13 @@ public class FailoverManager implements Watcher{
     private final String zooConnString;
     private CountDownLatch connectedSignal = new CountDownLatch(1);
     private final NameNode namenode;
+    private final NameNodeMetrics metrics;
 
 
 
-    public FailoverManager(NameNode namenode,String zookeeperConnString){
+    public FailoverManager(NameNode namenode, NameNodeMetrics metrics, String zookeeperConnString){
         this.namenode = namenode;
+        this.metrics = metrics;
         this.zooConnString = zookeeperConnString;
     }
 
@@ -152,26 +155,7 @@ public class FailoverManager implements Watcher{
         public void process(WatchedEvent event) {
             switch (event.getType()) {
             case NodeDeleted:
-                try {
-                    // Primary Namenode died. Do failover
-                    namenode.doFailover();
-                    //update the server info
-                    byte[] data = null;
-                    try {
-                        data  = inetSockAddr2String(namenode.getRpcAddress()).getBytes("UTF-8");
-                    } catch (UnsupportedEncodingException e) {
-                        LOG.fatal("Problem with enconding", e);
-                        throw new IOException(e.getMessage());
-                    }
-                    (new SetDataTransaction(zooConnection,NAMENODE_GROUP_PATH,data,-1)).invoke();
-                } catch (IOException e1) {
-                    namenode.stop();
-                } catch (KeeperException e1) {
-                    namenode.stop();
-                } catch (InterruptedException e1) {
-                    Thread.currentThread().interrupt();
-                }
-
+                doFailoverProcedures();
                 break;
 
             default:
@@ -182,7 +166,7 @@ public class FailoverManager implements Watcher{
                             .invoke();
                     if (result == null) {
                         // Node no longer exist
-                        namenode.doFailover();
+                        doFailoverProcedures();
                     }
                 } catch (KeeperException e) {
                     LOG.fatal("Some error setting the watcher", e);
@@ -190,13 +174,38 @@ public class FailoverManager implements Watcher{
                     namenode.stop();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                } catch (IOException e) {
-                    namenode.stop();
                 }
-
             }
 
         }
+
+		private void doFailoverProcedures() {
+
+			long start = System.currentTimeMillis();
+
+			try {
+			    // Primary Namenode died. Do failover
+			    namenode.doFailover();
+			    //update the server info
+			    byte[] data = null;
+			    try {
+			        data  = inetSockAddr2String(namenode.getRpcAddress()).getBytes("UTF-8");
+			    } catch (UnsupportedEncodingException e) {
+			        LOG.fatal("Problem with enconding", e);
+			        throw new IOException(e.getMessage());
+			    }
+			    (new SetDataTransaction(zooConnection,NAMENODE_GROUP_PATH,data,-1)).invoke();
+			} catch (IOException e1) {
+			    namenode.stop();
+			} catch (KeeperException e1) {
+			    namenode.stop();
+			} catch (InterruptedException e1) {
+			    Thread.currentThread().interrupt();
+			}
+
+			long finish = System.currentTimeMillis();
+			metrics.failoverTime.set((int)(finish-start));
+		}
 
     }
 
