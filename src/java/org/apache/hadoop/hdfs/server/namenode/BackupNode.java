@@ -46,7 +46,7 @@ import org.apache.hadoop.net.NetUtils;
  * <p>
  * Backup node can play two roles.
  * <ol>
- * <li>{@link NamenodeRole#CHECKPOINT} node periodically creates checkpoints,
+ * <li>{@link NamenodeRole#CHECKPOINT} node periodically creates checkpoints, 
  * that is downloads image and edits from the active node, merges them, and
  * uploads the new image back to the active.</li>
  * <li>{@link NamenodeRole#BACKUP} node keeps its namespace in sync with the
@@ -91,9 +91,7 @@ public class BackupNode extends NameNode implements FailoverProtocol {
     String addr = conf.get(BN_ADDRESS_NAME_KEY, BN_ADDRESS_DEFAULT);
     int port = NetUtils.createSocketAddr(addr).getPort();
     String hostName = DNS.getDefaultHost("default");
-     //FIXME: Change to work on local machine
-    //return new InetSocketAddress(hostName, port);
-    return new InetSocketAddress("localhost", port);
+    return new InetSocketAddress(hostName, port);
   }
 
   @Override // NameNode
@@ -128,11 +126,6 @@ public class BackupNode extends NameNode implements FailoverProtocol {
 
   @Override // NameNode
   protected void initialize(Configuration conf) throws IOException {
-
-  //set thing to be able to run backup on the same machine
-  conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,"file:///Users/Andre/project/hadoop/data/dfs/backup");
-  conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY,"file:///Users/Andre/project/hadoop/data/dfs/backup");
-
     // Trash is disabled in BackupNameNode,
     // but should be turned back on if it ever becomes active.
     conf.setLong("fs.trash.interval", 0L);
@@ -155,7 +148,7 @@ public class BackupNode extends NameNode implements FailoverProtocol {
     // therefore lease hard limit should never expire.
     namesystem.leaseManager.setLeasePeriod(
         FSConstants.LEASE_SOFTLIMIT_PERIOD, Long.MAX_VALUE);
-    // register with the active name-node
+    // register with the active name-node 
     registerWith(nsInfo);
     // Checkpoint daemon should start after the rpc server started
     runCheckpointDaemon(conf);
@@ -168,10 +161,10 @@ public class BackupNode extends NameNode implements FailoverProtocol {
   public void stop() {
     if(checkpointManager != null) {
       // Prevent from starting a new checkpoint.
-      // Checkpoints that has already been started may proceed until
+      // Checkpoints that has already been started may proceed until 
       // the error reporting to the name-node is complete.
       // Checkpoint manager should not be interrupted yet because it will
-      // close storage file channels and the checkpoint may fail with
+      // close storage file channels and the checkpoint may fail with 
       // ClosedByInterruptException.
       checkpointManager.shouldRun = false;
     }
@@ -336,7 +329,7 @@ public class BackupNode extends NameNode implements FailoverProtocol {
       bnImage.setStorageInfo(nsInfo);
     else if(bnImage.getNamespaceID() != nsInfo.getNamespaceID())
       throw new IOException("Incompatible namespaceIDs"
-          + ": active node namespaceID = " + nsInfo.getNamespaceID()
+          + ": active node namespaceID = " + nsInfo.getNamespaceID() 
           + "; backup node namespaceID = " + bnImage.getNamespaceID());
 
     setRegistration();
@@ -388,11 +381,11 @@ public class BackupNode extends NameNode implements FailoverProtocol {
   private static NamespaceInfo handshake(NamenodeProtocol namenode)
   throws IOException, SocketTimeoutException {
     NamespaceInfo nsInfo;
-    nsInfo = namenode.versionRequest();  // throws SocketTimeoutException
+    nsInfo = namenode.versionRequest();  // throws SocketTimeoutException 
     String errorMsg = null;
     // verify build version
     if( ! nsInfo.getBuildVersion().equals( Storage.getBuildVersion())) {
-      errorMsg = "Incompatible build versions: active name-node BV = "
+      errorMsg = "Incompatible build versions: active name-node BV = " 
         + nsInfo.getBuildVersion() + "; backup node BV = "
         + Storage.getBuildVersion();
       LOG.fatal(errorMsg);
