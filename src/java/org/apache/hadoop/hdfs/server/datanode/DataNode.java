@@ -74,6 +74,7 @@ import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
+import org.apache.hadoop.hdfs.server.namenode.BackupNode;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.FileChecksumServlets;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -313,7 +314,7 @@ public class DataNode extends Configured
     // connect to name node
     this.namenode = new DatanodeProtocols(2); //Override DataNode.namenode
     nameAddr1 = NameNode.getAddress(conf);
-    nameAddr2 = new InetSocketAddress("127.0.0.1",4444); //FIXME point to backupnode
+    nameAddr2 = BackupNode.getAddress(conf);
 
 
 

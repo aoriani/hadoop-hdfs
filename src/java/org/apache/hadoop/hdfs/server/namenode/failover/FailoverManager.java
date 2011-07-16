@@ -153,59 +153,69 @@ public class FailoverManager implements Watcher{
 
         @Override
         public void process(WatchedEvent event) {
-            switch (event.getType()) {
-            case NodeDeleted:
-                doFailoverProcedures();
-                break;
 
-            default:
-                Stat result = null;
-                try {
-                    result = (new ExistsTransaction(zooConnection,
-                            PRIMARY_NAMENODE_PATH, new PrimaryNodeWatcher()))
-                            .invoke();
-                    if (result == null) {
-                        // Node no longer exist
-                        doFailoverProcedures();
+            switch(event.getState()){
+
+                case SyncConnected:
+                    switch (event.getType()) {
+                        case NodeDeleted:
+                            doFailoverProcedures();
+                            break;
+
+                        default:
+                            Stat result = null;
+                            try {
+                                result = (new ExistsTransaction(zooConnection,
+                                        PRIMARY_NAMENODE_PATH, new PrimaryNodeWatcher()))
+                                        .invoke();
+                                if (result == null) {
+                                    // Node no longer exist
+                                    doFailoverProcedures();
+                                }
+                            } catch (KeeperException e) {
+                                LOG.fatal("Some error setting the watcher", e);
+                                //Safest approach is to die
+                                namenode.stop();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
                     }
-                } catch (KeeperException e) {
-                    LOG.fatal("Some error setting the watcher", e);
-                    //Safest approach is to die
+                 break;
+
+                case Expired:
                     namenode.stop();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+                break;
             }
 
         }
 
-		private void doFailoverProcedures() {
+        private void doFailoverProcedures() {
 
-			long start = System.currentTimeMillis();
+            long start = System.currentTimeMillis();
 
-			try {
-			    // Primary Namenode died. Do failover
-			    namenode.doFailover();
-			    //update the server info
-			    byte[] data = null;
-			    try {
-			        data  = inetSockAddr2String(namenode.getRpcAddress()).getBytes("UTF-8");
-			    } catch (UnsupportedEncodingException e) {
-			        LOG.fatal("Problem with enconding", e);
-			        throw new IOException(e.getMessage());
-			    }
-			    (new SetDataTransaction(zooConnection,NAMENODE_GROUP_PATH,data,-1)).invoke();
-			} catch (IOException e1) {
-			    namenode.stop();
-			} catch (KeeperException e1) {
-			    namenode.stop();
-			} catch (InterruptedException e1) {
-			    Thread.currentThread().interrupt();
-			}
+            try {
+                // Primary Namenode died. Do failover
+                namenode.doFailover();
+                //update the server info
+                byte[] data = null;
+                try {
+                    data  = inetSockAddr2String(namenode.getRpcAddress()).getBytes("UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    LOG.fatal("Problem with enconding", e);
+                    throw new IOException(e.getMessage());
+                }
+                (new SetDataTransaction(zooConnection,NAMENODE_GROUP_PATH,data,-1)).invoke();
+            } catch (IOException e1) {
+                namenode.stop();
+            } catch (KeeperException e1) {
+                namenode.stop();
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+            }
 
-			long finish = System.currentTimeMillis();
-			metrics.failoverTime.set((int)(finish-start));
-		}
+            long finish = System.currentTimeMillis();
+            metrics.failoverTime.set((int)(finish-start));
+        }
 
     }
 
