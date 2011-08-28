@@ -135,7 +135,10 @@ class Checkpointer extends Daemon {
     long lastCheckpointTime = 0;
     if(!backupNode.shouldCheckpointAtStartup())
       lastCheckpointTime = FSNamesystem.now();
-    while(shouldRun) {
+
+    // Do checkpoint only once to ensure NN-BN sync
+    //This is a workaround for i https://issues.apache.org/jira/browse/HDFS-1989,
+    do {
       try {
         long now = FSNamesystem.now();
         boolean shouldCheckpoint = false;
@@ -162,7 +165,7 @@ class Checkpointer extends Daemon {
       } catch(InterruptedException ie) {
         // do nothing
       }
-    }
+    }while(false);
   }
 
   private long getJournalSize() throws IOException {

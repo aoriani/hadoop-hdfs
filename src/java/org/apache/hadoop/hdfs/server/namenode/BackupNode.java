@@ -158,8 +158,8 @@ public class BackupNode extends NameNode implements FailoverProtocol {
     // Checkpoint daemon should start after the rpc server started
     runCheckpointDaemon(conf);
 
-    failoverServer = RPC.getServer(FailoverProtocol.class,this, "127.0.0.1", 4444, conf);
-    failoverServer.start();
+//    failoverServer = RPC.getServer(FailoverProtocol.class,this, "127.0.0.1", 4444, conf);
+//    failoverServer.start();
   }
 
   @Override // NameNode
