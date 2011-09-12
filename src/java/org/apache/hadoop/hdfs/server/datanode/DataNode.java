@@ -472,7 +472,7 @@ public class DataNode extends Configured
                            getConf());
           ((DatanodeProtocols)namenode).setDatanodeProtocol(namenode1, 0);
         }
-        nsInfo = handshake(namenode1, nameAddr1);
+        if(doWait) nsInfo = handshake(namenode1, nameAddr1);
       } catch(ConnectException se) {  // namenode has not been started
         LOG.info("Server at " + nameAddr1 + " not available yet, Zzzzz...");
       } catch(SocketTimeoutException te) {  // namenode is busy
@@ -487,7 +487,7 @@ public class DataNode extends Configured
                            getConf());
           ((DatanodeProtocols)namenode).setDatanodeProtocol(namenode2, 1);
         }
-        nsInfo = handshake(namenode2, nameAddr2);
+        if(doWait) nsInfo = handshake(namenode2, nameAddr2);
       } catch(ConnectException se) {  // namenode has not been started
         LOG.info("Server at " + nameAddr2 + " not available yet, Zzzzz...");
       } catch(SocketTimeoutException te) {  // namenode is busy
@@ -1185,13 +1185,15 @@ public class DataNode extends Configured
 
       } catch (Exception ex) {
         LOG.error("Exception: " + StringUtils.stringifyException(ex));
-        if (shouldRun) {
+      }
+
+      if (shouldRun) {
           try {
             Thread.sleep(5000);
           } catch (InterruptedException ie) {
           }
         }
-      }
+
     }
 
     LOG.info(dnRegistration + ":Finishing DataNode in: "+data);
