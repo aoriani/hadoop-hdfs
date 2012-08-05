@@ -335,9 +335,23 @@ public class LeaseManager {
   }
 
   synchronized void expireAll(){
+	  //When setting the lease to expired (lastUpdate set to zero) we will be
+	  //corrupting the sort key of the TreeSet sortedLeases. This will break
+	  // the BST properties, making the data structure erractic.
+	  //
+	  // To fix the problem we need to added the leases to a new TreeSet after
+	  // the changes. Because the lease is only modified before it is insert in
+	  // the new treeset, this one will preserve the BST properties
+
+	  TreeSet<Lease> newSortedLeases =  new TreeSet<Lease>();
+
 	  for(Lease lease:sortedLeases){
 		  lease.expire();
+		  newSortedLeases.add(lease);
 	  }
+
+	  //Change to the new correct TreeSet
+	  sortedLeases = newSortedLeases;
   }
   static private List<Map.Entry<String, Lease>> findLeaseWithPrefixPath(
       String prefix, SortedMap<String, Lease> path2lease) {
