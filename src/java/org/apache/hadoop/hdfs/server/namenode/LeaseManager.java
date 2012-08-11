@@ -353,6 +353,35 @@ public class LeaseManager {
 	  //Change to the new correct TreeSet
 	  sortedLeases = newSortedLeases;
   }
+
+    synchronized void recoverFilesInProgress() {
+        LOG.info("Initializing in progress file recovery");
+        /*
+         * In our current model all in progress files are lost during a failover
+         * Clients will retry to write file since the beginning We need to
+         * cleanup or client trying to rewrite the file will have a hard time
+         *
+         * If file was not close, there still a lease for it.
+         */
+
+        for (Lease lease : sortedLeases) {
+            for (String path : lease.getPaths()) {
+                try {
+                    fsnamesystem.forceCloseFile(path);
+                } catch (IOException e) {
+                    LOG.error("Could not forcibly close " + path);
+                }
+            }
+        }
+
+        // Clear leases
+        LOG.info("Clearing Leases");
+        sortedLeases.clear();
+        leases.clear();
+        sortedLeasesByPath.clear();
+
+    }
+
   static private List<Map.Entry<String, Lease>> findLeaseWithPrefixPath(
       String prefix, SortedMap<String, Lease> path2lease) {
     if (LOG.isDebugEnabled()) {

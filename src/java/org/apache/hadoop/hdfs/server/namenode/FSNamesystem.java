@@ -2113,6 +2113,41 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     return false;
   }
 
+    void forceCloseFile(String path) throws IOException {
+        INodeFile iFile = dir.getFileINode(path);
+        if (iFile == null) {
+            LOG.error("Could not get the inode for the file");
+            throw new RuntimeException(
+                    "ForceCloseFile: Could not get the inode for the file");
+        }
+        if (!iFile.isUnderConstruction()) {
+            LOG.error("File is already closed. Why do it still have a lease?");
+        }
+        INodeFileUnderConstruction pendingFile = (INodeFileUnderConstruction) iFile;
+        int nrBlocks = pendingFile.numBlocks();
+        BlockInfo[] blocks = pendingFile.getBlocks();
+
+        int nrCompleteBlocks;
+        BlockInfo curBlock = null;
+        for (nrCompleteBlocks = 0; nrCompleteBlocks < nrBlocks; nrCompleteBlocks++) {
+            curBlock = blocks[nrCompleteBlocks];
+            if (!curBlock.isComplete()) {
+                break;
+            }
+        }
+        LOG.info("Forcing closing file " + path + " with " + nrBlocks
+                + ", which " + nrCompleteBlocks + " are complete");
+        /*
+         * Close file without any checks. We do not need to check for
+         * replication, because if it failed it is not expected to have all the
+         * replicas and stuff
+         */
+        INodeFile newFile = pendingFile.convertToInodeFile();
+        dir.replaceNode(path, pendingFile, newFile);
+        dir.closeFile(path, newFile);
+
+    }
+
   Lease reassignLease(Lease lease, String src, String newHolder,
                       INodeFileUnderConstruction pendingFile) {
     if(newHolder == null)
